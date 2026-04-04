@@ -2,7 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const mongoose = require("mongoose");
 const User = require("./models/User");
-
+require("dotenv").config();
 let latestReps = 0;
 
 const app = express();
@@ -12,7 +12,7 @@ app.use(cors());
 app.use(express.json());
 
 // MongoDB connection
-mongoose.connect("mongodb+srv://gandalaganesh31_db_user:4BSADg37CAmc1LOc@cluster0.axs9vyu.mongodb.net/gymbuddy")
+mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log("MongoDB connected"))
   .catch((err) => console.log(err));
 
