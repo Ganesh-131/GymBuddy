@@ -3,19 +3,23 @@ from exercises.bicep import run_bicep
 
 app = Flask(__name__)
 
-# Test route
 @app.route("/")
 def home():
     return jsonify({"message": "AI Server Running"})
 
-# BICEP CURL
 @app.route("/bicep", methods=["GET"])
 def bicep():
-    target = int(request.args.get("target", 10))  # default 10
-    reps = run_bicep(target)
-    return jsonify({"reps": reps})
+    target = int(request.args.get("target", 10))
 
-# OPTIONAL (dummy for now)
+    reps, duration = run_bicep(target)
+
+   reps, duration = run_bicep(target)
+
+    return jsonify({
+        "reps": reps,
+        "duration": duration
+    })
+
 @app.route("/pushup", methods=["GET"])
 def pushup():
     return jsonify({"reps": 15})

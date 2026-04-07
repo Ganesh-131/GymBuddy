@@ -1,19 +1,10 @@
 import cv2
 import mediapipe as mp
 import numpy as np
-import pyttsx3
+import time
 
 def run_bicep(target_reps):
 
-    # ---------------- VOICE ----------------
-    engine = pyttsx3.init()
-    engine.setProperty('rate', 155)
-
-    def speak(text):
-        engine.say(text)
-        engine.runAndWait()
-
-    # ---------------- MEDIAPIPE ----------------
     mp_pose = mp.solutions.pose
     mp_draw = mp.solutions.drawing_utils
     pose = mp_pose.Pose()
@@ -29,23 +20,27 @@ def run_bicep(target_reps):
         cosine = np.dot(ba, bc) / (np.linalg.norm(ba) * np.linalg.norm(bc) + 1e-6)
         return np.degrees(np.arccos(np.clip(cosine, -1.0, 1.0)))
 
-    # ---------------- VARIABLES ----------------
     counter = 0
-    state = "INIT"
-    last_state = ""
+    stage = "DOWN"   # DOWN → UP → DOWN
 
     cap = cv2.VideoCapture(0)
+
+    # 🔥 Bigger camera
+    cap.set(3, 1280)
+    cap.set(4, 720)
+
+    start_time = time.time()
 
     while cap.isOpened():
         ret, frame = cap.read()
         if not ret:
             break
 
+        frame = cv2.flip(frame, 1)
+
         h, w, _ = frame.shape
         rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         result = pose.process(rgb)
-
-        feedback = ""
 
         if result.pose_landmarks:
             lm = result.pose_landmarks.landmark
@@ -61,65 +56,48 @@ def run_bicep(target_reps):
 
             angle = calculate_angle(shoulder, elbow, wrist)
 
-            # ---------------- STATE MACHINE ----------------
-            if state == "INIT":
-                feedback = "Stand straight"
-                if angle > 165:
-                    state = "READY"
+            # ---------------- REP LOGIC ----------------
+            if angle > 160:
+                if stage == "UP":
+                    counter += 1   # full rep completed
+                stage = "DOWN"
 
-            elif state == "READY":
-                feedback = "Curl your arm"
-                if angle < 60:
-                    state = "CURL"
+            elif angle < 50:
+                stage = "UP"
 
-            elif state == "CURL":
-                feedback = "Return down"
-                if angle > 165:
-                    counter += 1
-                    state = "READY"
-
-            # ---------------- VOICE ----------------
-            if state != last_state:
-                speak(feedback)
-                last_state = state
-
-            # ---------------- DISPLAY ----------------
-            cv2.putText(frame, f"Angle: {int(angle)}",
-                        (30, 160), cv2.FONT_HERSHEY_SIMPLEX,
-                        1, (0,255,0), 2)
-
+            # ---------------- DRAW ----------------
             mp_draw.draw_landmarks(frame,
                                    result.pose_landmarks,
                                    mp_pose.POSE_CONNECTIONS)
 
+            cv2.putText(frame, f"Angle: {int(angle)}",
+                        (30, 200), cv2.FONT_HERSHEY_SIMPLEX,
+                        1, (0,255,0), 2)
+
         # ---------------- UI ----------------
-        cv2.rectangle(frame, (0,0), (640,140), (0,0,0), -1)
+        cv2.rectangle(frame, (0,0), (1280,120), (0,0,0), -1)
 
         cv2.putText(frame, "Gym Buddy - Bicep Curl",
                     (20,30), cv2.FONT_HERSHEY_SIMPLEX,
                     1, (255,255,255), 2)
 
         cv2.putText(frame, f"Reps: {counter}",
-                    (20,70), cv2.FONT_HERSHEY_SIMPLEX,
-                    1, (0,255,0), 2)
-
-        cv2.putText(frame, f"Target: {target_reps}",
-                    (20,110), cv2.FONT_HERSHEY_SIMPLEX,
-                    0.9, (255,255,0), 2)
+                    (20,80), cv2.FONT_HERSHEY_SIMPLEX,
+                    1.2, (0,255,0), 3)
 
         cv2.imshow("Gym Buddy", frame)
 
-        # ---------------- AUTO STOP (FIXED PROPERLY) ----------------
+        # ---------------- STOP ----------------
         if counter >= target_reps:
-            print("Target reached")
-            cv2.waitKey(500)   # small delay for stability
+            cv2.waitKey(500)
             break
 
-        # ---------------- MANUAL STOP ----------------
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
 
     cap.release()
     cv2.destroyAllWindows()
 
-    return counter
+    duration = int(time.time() - start_time)
+
+    return counter, duration
